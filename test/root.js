@@ -1,23 +1,30 @@
 global.expect = require('expect');
-const { JSDOM } = require('jsdom');
+
+const babel = require('@babel/core');
+const jsdom = require('jsdom');
 const path = require('path');
 
 before(function(done) {
-  const html = '<!DOCTYPE html><html><body></body></html>';
-  const jsdomConfig = {
-    runScripts: 'dangerously',
-    resources: 'usable',
-    url: 'http://localhost'
-  };
+  const babelResult = babel.transformFileSync(
+    path.resolve(__dirname, '..', 'index.js'), {
+      presets: ['@babel/preset-env'] 
+    }
+  );
 
-  const dom = new JSDOM(html, jsdomConfig);
-  const virtualConsole = dom.window.virtualConsole;
+  const html = path.resolve(__dirname, '..', 'index.html')
 
-  // Setting up global variables for testing environment
-  global.window = dom.window;
-  global.document = dom.window.document;
-  global.navigator = dom.window.navigator;
-  global.console = dom.window.console;
+  jsdom.env(html, [], {
+    src: babelResult.code,
+    virtualConsole: jsdom.createVirtualConsole().sendTo(console)
+  }, (err, window) => {
+    if (err) {
+      return done(err);
+    }
 
-  done();
+    Object.keys(window).forEach(key => {
+      global[key] = window[key];
+    });
+
+    return done();
+  });
 });
